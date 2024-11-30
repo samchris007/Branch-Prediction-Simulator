@@ -42,14 +42,6 @@ int main (int argc, char* argv[])
     bp_params params;       // look at sim_bp.h header file for the the definition of struct bp_params
     char outcome;           // Variable holds branch outcome
     unsigned long int addr; // Variable holds the address read from input file
-    argv[0] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\sim_bp.cc");
-    argv[1] = strdup("hybrid");
-    argv[2] = strdup("5");
-    argv[3] = strdup("10");
-    argv[4] = strdup("7");
-    argv[5] = strdup("5");
-    argv[6] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\benchmarks\\jpeg_trace.txt");
-    argc = 7;
 
     if (!(argc == 4 || argc == 5 || argc == 7))
     {
