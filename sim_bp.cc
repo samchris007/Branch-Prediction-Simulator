@@ -2,194 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <math.h>
-#include <cmath>
 #include "sim_bp.h"
-
-/*  argc holds the number of command line arguments
-    argv[] holds the commands themselves
-
-    Example:-
-    sim bimodal 6 gcc_trace.txt
-    argc = 4
-    argv[0] = "sim"
-    argv[1] = "bimodal"
-    argv[2] = "6"
-    ... and so on
-*/
-
-
-
-class TableElement 
-{  
-    public:
-        int PredictedValue;
-
-        TableElement(int num)
-        {
-            PredictedValue = num;
-        }
-
-        void IncrementPredictedValue() 
-        {
-            if (PredictedValue == 3)
-            {
-                return;
-            }
-            PredictedValue++;
-        }
-
-        void DecrementPredictedValue() 
-        {
-            if (PredictedValue == 0) 
-            {
-                return;
-            }
-            PredictedValue--;
-        }
-
-        bool IsTaken()
-        {
-            return PredictedValue > 1;
-        }
-
-        bool UseGSharePredictor()
-        {
-            return PredictedValue > 1;
-        }
-};
-
-class PredictionTable
-{
-    public:
-        TableElement** PredictionTableArray;
-        uint32_t GlobalBranchHistoryRegister;
-        uint32_t PredictionElementsCount;
-        int MisPredictions = 0;
-        uint32_t NValue;
-
-        PredictionTable(uint32_t mValue, uint32_t nValue)
-        {
-            NValue = nValue;
-            GlobalBranchHistoryRegister = 0 << nValue;
-            if (mValue < 0 || mValue > 31)
-            {
-                return;
-            }
-
-            PredictionElementsCount = 1u << mValue;
-            PredictionTableArray = new TableElement*[PredictionElementsCount];
-            for (uint32_t i = 0; i < PredictionElementsCount; ++i) 
-            {
-                PredictionTableArray[i] = new TableElement(2);
-            }
-        };
-
-        // void IncrementMisPredictionsIfPredictionIsCorrect(uint32_t index, bool isReallyTaken)
-        // {
-        //     if (PredictionTableArray[index]->IsTaken() != isReallyTaken)
-        //     {
-        //         MisPredictions++;
-        //     }
-            
-        //     if (NValue > 0)
-        //     {
-        //         GlobalBranchHistoryRegister = GlobalBranchHistoryRegister >> 1;
-        //         uint32_t msbFlag = static_cast<uint32_t>(isReallyTaken) << (NValue - 1);
-        //         GlobalBranchHistoryRegister = GlobalBranchHistoryRegister | msbFlag;
-        //     }
-        // }
-
-        void UpdateCounter(uint32_t index, bool isReallyTaken)
-        {
-            if (PredictionTableArray[index]->IsTaken() != isReallyTaken)
-            {
-                MisPredictions++;
-            }
-
-            if (isReallyTaken)
-            {
-                PredictionTableArray[index]->IncrementPredictedValue();
-            }
-            else
-            {
-                PredictionTableArray[index]->DecrementPredictedValue();
-            }
-        }
-
-        void UpdateGlobalRegister(bool isReallyTaken)
-        {
-            if (NValue > 0)
-            {
-                GlobalBranchHistoryRegister = GlobalBranchHistoryRegister >> 1;
-                uint32_t msbFlag = static_cast<uint32_t>(isReallyTaken) << (NValue - 1);
-                GlobalBranchHistoryRegister = GlobalBranchHistoryRegister | msbFlag;
-            }
-        }
-};
-
-class ChooserTable
-{
-    public:
-        TableElement** ChooserTableArray;
-        uint32_t PredictionElementsCount;
-        
-        ChooserTable(int kValue)
-        {
-            if (kValue < 0 || kValue > 31)
-            {
-                return;
-            }
-            PredictionElementsCount = 1 << kValue;
-            ChooserTableArray = new TableElement*[PredictionElementsCount];
-            for (uint32_t i = 0; i < PredictionElementsCount; ++i) 
-            {
-                ChooserTableArray[i] = new TableElement(1);
-            }
-        }
-
-        void UpdateCounter(uint32_t index, bool isGshareCorrect, bool isBiModalCorrect)
-        {
-            if (!isGshareCorrect && isBiModalCorrect)
-            {
-                ChooserTableArray[index]->DecrementPredictedValue();
-            }
-            else if (isGshareCorrect && !isBiModalCorrect)
-            {
-                ChooserTableArray[index]->IncrementPredictedValue();
-            }
-        }
-};
-
-class Helpers
-{
-    public:
-        static void GetIndexBits(uint32_t address, int mValue, uint32_t& indexBits, uint32_t branchHistoryReg = 0, int nValue = 0) 
-        {
-            address = address >> 2;
-            uint32_t mask = (1 << mValue) - 1;
-            uint32_t initialIndexBits = address & mask;
-            if (nValue == 0)
-            {
-                indexBits = initialIndexBits;
-                return;
-            }
-            uint32_t mAndnMask = (1 << (mValue - nValue)) - 1;
-            uint32_t lowerBits = initialIndexBits & mAndnMask;
-            uint32_t upperBits = initialIndexBits >> (mValue - nValue);
-            mask = (1u << nValue) - 1;
-            upperBits = upperBits & mask;
-            upperBits = branchHistoryReg ^ upperBits;
-            indexBits = (upperBits << (mValue - nValue)) | lowerBits;
-        }
-
-        static void GetIndexBitsForChooserTable(uint32_t address, int kValue, uint32_t& indexBits) 
-        {
-            address = address >> 2;
-            uint32_t mask = (1 << kValue) - 1;
-            indexBits = address & mask;
-        }
-};
+#include "src/table_element.h"
+#include "src/chooser_table.h"
+#include "src/prediction_table.h"
+#include "src/helpers.h"
 
 void ShowChooserContents(ChooserTable chooserTable)
 {
@@ -218,7 +35,6 @@ void ShowBiModal(PredictionTable predictionTable)
     }
 }
 
-
 int main (int argc, char* argv[])
 {
     FILE *FP;               // File handler
@@ -226,15 +42,14 @@ int main (int argc, char* argv[])
     bp_params params;       // look at sim_bp.h header file for the the definition of struct bp_params
     char outcome;           // Variable holds branch outcome
     unsigned long int addr; // Variable holds the address read from input file
-    
-    // argv[0] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\cpp_files\\sim_bp.cc");
-    // argv[1] = strdup("hybrid");
-    // argv[2] = strdup("5");
-    // argv[3] = strdup("10");
-    // argv[4] = strdup("7");
-    // argv[5] = strdup("5");
-    // argv[6] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\jpeg_trace.txt");
-    // argc = 7;
+    argv[0] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\sim_bp.cc");
+    argv[1] = strdup("hybrid");
+    argv[2] = strdup("5");
+    argv[3] = strdup("10");
+    argv[4] = strdup("7");
+    argv[5] = strdup("5");
+    argv[6] = strdup("C:\\Users\\samch\\OneDrive\\Documents\\NCSU\\563\\Branch Prediction\\Branch-Predictor\\benchmarks\\jpeg_trace.txt");
+    argc = 7;
 
     if (!(argc == 4 || argc == 5 || argc == 7))
     {
@@ -304,6 +119,7 @@ int main (int argc, char* argv[])
     PredictionTable predictionTableForGShare = PredictionTable(params.M1, params.N);
     ChooserTable chooserTable = ChooserTable(params.K);
     uint32_t predictions = 0;
+
     while(fscanf(FP, "%lx %s", &addr, str) != EOF)
     {
         outcome = str[0];
