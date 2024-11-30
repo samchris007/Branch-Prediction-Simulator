@@ -8,7 +8,7 @@ This repo contains implementation which involves building a **branch prediction 
 
 - **Bimodal Predictor**: Simulates a simple bimodal branch predictor using the program counter (PC) bits as an index.
 - **Gshare Predictor**: Simulates a gshare branch predictor that combines PC bits with a global history register.
-- **Hybrid Predictor** (ECE 563 only): Simulates a hybrid branch predictor that selects between bimodal and gshare predictions using a chooser table.
+- **Hybrid Predictor**: Simulates a hybrid branch predictor that selects between bimodal and gshare predictions using a chooser table.
 
 ## Inputs and Outputs
 
